@@ -14,7 +14,7 @@ function Objeto3D(nombre) {
 		a_VertexPosition: null,	// Atributos
 		//a_TextCoord: null,
 		a_VertexNormal: null
-	}
+	};
 	this.uniformes = {
 		u_Matrix: null,			// Uniformes
 		u_VMatrix: null,
@@ -39,6 +39,44 @@ function Objeto3D(nombre) {
 		normalBuffer: null,
 		carasBuffer: null
 	};
+
+	/* Introduce la ubicacion de los atributos de "programInfo" en la
+	 * propiedad "atributos" del Objeto3D para acceder a ellos mas
+	 * facilmente.
+	 */
+	this.localizaAtributos = function() {
+		this.atributos.a_VertexPosition = gl.getAttribLocation(
+			this.programInfo, "a_VertexPosition");
+		// -------------------------------------------
+		//this.atributos.a_TextCoord = gl.getAttribLocation(
+		//	this.programInfo, "a_TextCoord");
+		// -------------------------------------------
+		this.atributos.a_VertexNormal = gl.getAttribLocation(
+			this.programInfo, "a_VertexNormal");
+	}
+
+	/* Introduce la ubicacion de las matrices uniformes de "programInfo"
+	 * en la propiedad "uniformes" del Objeto3D para acceder a
+	 * ellas mas facilmente.
+	 */
+	this.localizaUniformes = function() {
+		this.uniformes.u_Matrix = gl.getUniformLocation(
+			this.programInfo, "u_Matrix");
+		this.uniformes.u_VMatrix = gl.getUniformLocation(
+			this.programInfo, "u_VMatrix");
+		this.uniformes.u_PMatrix = gl.getUniformLocation(
+			this.programInfo, "u_PMatrix");
+		this.uniformes.u_LuzPosicion = gl.getUniformLocation(
+			this.programInfo, "u_LuzPosicion");
+		this.uniformes.u_Ambiental = gl.getUniformLocation(
+			this.programInfo, "u_Ambiental");
+		this.uniformes.u_Difusa = gl.getUniformLocation(
+			this.programInfo, "u_Difusa");
+		this.uniformes.u_Especular = gl.getUniformLocation(
+			this.programInfo, "u_Especular");
+		this.uniformes.u_Brillantez = gl.getUniformLocation(
+			this.programInfo, "u_Brillantez");
+	}
 
 	/* Inicia los buffers del Objeto3D a partir de los datos
 	 * de this.datos.
@@ -150,51 +188,5 @@ function Objeto3D(nombre) {
 
 		gl.uniform1f(this.uniformes.u_Brillantez, 
 			this.datos.material.brillantez);
-	};
-}
-
-/* Prototipo Material
- * Propiedades:
- * 	- nombre: nombre del material
- *  - ambiental: colores "ambientales" del material
- *  - difusa: colores "difusos" del material.
- *  - especular: colores "especulares" del material.
- *  - brillantez: constante de "brillantez" del material.
- *  - rutaTextura: ruta de la textura
- *  - textura: la textura del material
- */
-function Material(nombre) {
-	// Nombre
-	this.nombre = nombre;
-	// Datos para la iluminacion
-	this.ambiental = [0.0, 0.0, 0.0, 1.0];
-	this.difusa = [0.0, 0.0, 0.0, 1.0];
-	this.especular = [0.0, 0.0, 0.0, 1.0];
-	this.brillantez = 0.5;
-	// Datos para la textura
-	this.rutaTextura = null;
-	this.textura = null;
-	
-	/* Introduce la imagen dada por "rutaTextura" en la "textura".
-	 */
-	this.cargaTextura = function() {
-		this.textura = gl.createTexture();	// Creamos la textura.
-		this.textura.image = new Image();	// Añadimos la imagen
-		this.textura.image.onload = function() {
-			// Una vez cargada la imagen la copiamos a la textura.
-			
-			// Trabajaremos solo sobre this.textura
-			gl.bindTexture(gl.TEXTURE_2D, this.textura);
-			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
-				gl.UNSIGNED_BYTE, this.textura.image);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,
-				gl.NEAREST);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
-				gl.NEAREST);				
-			// Limpiamos los enlaces
-			gl.bindTexture(gl.TEXTURE_2D, null);
-		}
-		this.textura.image.src = this.rutaTextura;
 	};
 }
