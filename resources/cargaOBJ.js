@@ -10,8 +10,8 @@
 	this.normales = [];
 
 	/* A partir de los indices a las normales de "normalArray", almacenados
-	 * en la propiedad "normales" del vertice, calculamos la normal del vertice
-	 * mediante una media normalizada.
+	 * en la propiedad "normales" del vertice, calculamos la normal del 
+	 * vertice mediante una media normalizada.
 	 */
 	this.calcNormalV = function(normalArray) {
 		// this.normales = (N1+N2+...+Nn) / |N1+N2+...+Nn|
@@ -125,9 +125,8 @@ function introduceCara(palabra, objeto3D, restaV) {
 	}
 }
 
-/* Retorna un array con los objetos3D a partir del texto 
- * "archivoOBJString" pasado.
- * En "archivoMTLString" estan los materiales de los objetos.
+/* Retorna un array con los objetos3D a partir del texto "archivoOBJString" 
+ * pasado. En "archivoMTLString" estan los materiales de los objetos.
  * Las caras de los objetos han de ser triangulos.
  */
 function leerOBJ(archivoOBJString, archivoMTLString) {
@@ -138,7 +137,6 @@ function leerOBJ(archivoOBJString, archivoMTLString) {
 		normalArray = [];	// Array con las normales de los vertices
 	var indiceObj = -1, contador = 1, resta = 1;
 	var palabra = null;
-
 	for (var i = 0; i < lineasOBJ.length; i++){
 		if (lineasOBJ[i] != null) {
 			palabra = lineaToPalabras(lineasOBJ[i]);
@@ -173,48 +171,9 @@ function leerOBJ(archivoOBJString, archivoMTLString) {
 			}
 		}
 	}
-	// Colores.
 	//setData(objetos3D, normalArray, uvArray, materiales);
 	setData(objetos3D, normalArray, materiales);
 	return objetos3D.reverse();
-}
-
-/* A partir de los datos "Vertice" almacenados actualmente en cada
- * objeto3D.data.vertices calculamos las normales y las introducimos
- * en la propiedad "normales" de los objetos3D.
- * Tambien sustituye los datos Vertice en objeto3D.data.vertices por las
- * coordenadas de los vertices e introduce el respectivo material de
- * cada objeto3D.
- */
-function setData(objetos3D, normalArray, materiales) {
-	objetos3D.forEach(function(objeto3D) {
-		var vertice;
-		var arrayVCoord = [],
-			//arrayVUvCoord = [],
-			arrayVNormal = [];
-		for (var i in objeto3D.datos.vertices) {
-			vertice = objeto3D.datos.vertices[i];
-			vertice.calcNormalV(normalArray);
-			arrayVCoord = arrayVCoord.concat(vertice.coordenadas);
-			//arrayVUvCoord = arrayVUvCoord.concat(vertice.uvCoords);
-			arrayVNormal = arrayVNormal.concat(vertice.normales);
-		}	
-		objeto3D.datos.vertices = arrayVCoord;
-		//objeto3D.datos.uvCoords = arrayVUvCoord;
-		objeto3D.datos.normales = arrayVNormal;
-		introduceMateriales(objeto3D, materiales);
-	});
-}
-
-/* Introduce el material que le corresponde a objeto3D a partir
- * del array "materiales".
- */
-function introduceMateriales(objeto3D, materiales) {
-	materiales.forEach(function(material) {
-		if (objeto3D.datos.material.nombre == material.nombre) {
-			objeto3D.datos.material = material;
-		}
-	});
 }
 
 /* Retorna un array con los materiales a partir del texto pasado.
@@ -258,4 +217,42 @@ function leerMTL(archivoMTLString) {
 		}
 	}
 	return materiales;
+}
+
+/* A partir de los datos "Vertice" almacenados actualmente en cada
+ * objeto3D.data.vertices calculamos las normales y las introducimos
+ * en la propiedad "normales" de los objetos3D.
+ * Tambien sustituye los datos Vertice en objeto3D.data.vertices por las
+ * coordenadas de los vertices e introduce el respectivo material de
+ * cada objeto3D.
+ */
+function setData(objetos3D, normalArray, materiales) {
+	objetos3D.forEach(function(objeto3D) {
+		var vertice;
+		var arrayVCoord = [],
+			//arrayVUvCoord = [],
+			arrayVNormal = [];
+		for (var i in objeto3D.datos.vertices) {
+			vertice = objeto3D.datos.vertices[i];
+			vertice.calcNormalV(normalArray);
+			arrayVCoord = arrayVCoord.concat(vertice.coordenadas);
+			//arrayVUvCoord = arrayVUvCoord.concat(vertice.uvCoords);
+			arrayVNormal = arrayVNormal.concat(vertice.normales);
+		}	
+		objeto3D.datos.vertices = arrayVCoord;
+		//objeto3D.datos.uvCoords = arrayVUvCoord;
+		objeto3D.datos.normales = arrayVNormal;
+		introduceMateriales(objeto3D, materiales);
+	});
+}
+
+/* Introduce el material que le corresponde a objeto3D a partir del array 
+ * "materiales".
+ */
+function introduceMateriales(objeto3D, materiales) {
+	materiales.forEach(function(material) {
+		if (objeto3D.datos.material.nombre == material.nombre) {
+			objeto3D.datos.material = material;
+		}
+	});
 }

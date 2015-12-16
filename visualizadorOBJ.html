@@ -15,6 +15,7 @@
 	<script type="text/javascript" src="./resources/gl-matrix.js"></script>
 	<script type="text/javascript" src="./resources/cargaOBJ.js"></script>
 	<script type="text/javascript" src="./resources/objeto3D.js"></script>
+	<script type="text/javascript" src="./resources/material.js"></script>
 	<script type="text/javascript">
 		/****************  Variables Globales  ****************/
 		// Variables globales del programa.
@@ -29,8 +30,8 @@
 		var fovy = 45;
 		// Variable global con la luz de la escena
 		var luz = {
-			posicion: [1.0, 1.0, 1.0, 0.0],
-			ambiental: [0.2, 0.2, 0.2, 1.0],
+			posicion: [0.0, -2.0, 5.0, 0.0],
+			ambiental: [0.25, 0.25, 0.25, 1.0],
 			difusa: [1.0, 1.0, 1.0, 1.0],
 			especular: [1.0, 1.0, 1.0, 1.0]
 		};
@@ -145,38 +146,12 @@
 			objetos3D.forEach(function(objeto3D) {
 				// Obtenemos los shaders de cada objeto3D.
 				objeto3D.programInfo = initShaders();
-				/* Introducimos la ubicacion de los atributos en la propiedad
-				 * "atributos" de cada objeto3D para acceder a ellos mas
-				 * facilmente.
+				/* Obtenemos la ubicacion de los atributos y uniformes de cada
+				 * objeto3D en sus propiedades "atributos" y "uniformes" para
+				 * acceder a ellos mas facilmente.
 				 */
-				objeto3D.atributos.a_VertexPosition = gl.getAttribLocation(
-					objeto3D.programInfo, "a_VertexPosition");
-				// -------------------------------------------
-				//objeto3D.atributos.a_TextCoord = gl.getAttribLocation(
-				//	objeto3D.programInfo, "a_TextCoord");
-				// -------------------------------------------
-				objeto3D.atributos.a_VertexNormal = gl.getAttribLocation(
-					objeto3D.programInfo, "a_VertexNormal");
-				/* Introducimos la ubicacion de las matrices uniformes en 
-				 * la propiedad "uniformes" de cada objeto3D para acceder a
-				 * ellas mas facilmente.
-				 */
-				objeto3D.uniformes.u_Matrix = gl.getUniformLocation(
-					objeto3D.programInfo, "u_Matrix");
-				objeto3D.uniformes.u_VMatrix = gl.getUniformLocation(
-					objeto3D.programInfo, "u_VMatrix");
-				objeto3D.uniformes.u_PMatrix = gl.getUniformLocation(
-					objeto3D.programInfo, "u_PMatrix");
-				objeto3D.uniformes.u_LuzPosicion = gl.getUniformLocation(
-					objeto3D.programInfo, "u_LuzPosicion");
-				objeto3D.uniformes.u_Ambiental = gl.getUniformLocation(
-					objeto3D.programInfo, "u_Ambiental");
-				objeto3D.uniformes.u_Difusa = gl.getUniformLocation(
-					objeto3D.programInfo, "u_Difusa");
-				objeto3D.uniformes.u_Especular = gl.getUniformLocation(
-					objeto3D.programInfo, "u_Especular");
-				objeto3D.uniformes.u_Brillantez = gl.getUniformLocation(
-					objeto3D.programInfo, "u_Brillantez");
+				objeto3D.localizaAtributos();
+				objeto3D.localizaUniformes();
 			});
 		}
 
@@ -250,7 +225,7 @@
 			
 			// Obtenemos las matrices de Vision, Profundidad y Modelo.
 			var mVision = getMVision();
-			var mPerspectiva = getMPerspectiva();
+			var mPerspectiva = getMPerspectiva(fovy, canvas);
 			var mModelo = getMModelo(g_Traslacion, g_Rotacion, g_Escala);
 			
 			//console.log(objetos3D);
@@ -264,11 +239,6 @@
 				
 				// Texturas:
 				/*
-				gl.activeTexture(gl.TEXTURE0 + contTextura);
-				gl.bindTexture(gl.TEXTURE_2D, objeto3D.datos.material.textura);
-				gl.uniform1i(objeto3D.programInfo.samplerUniform, contTextura);
-				contTextura++;
-
 				gl.activeTexture(gl.TEXTURE0);
 				gl.bindTexture(gl.TEXTURE_2D, objeto3D.datos.material.textura);
 				gl.uniform1i(objeto3D.programInfo.samplerUniform, 0);
@@ -284,7 +254,40 @@
 			//Cleanup texture binds.
 			//gl.bindTexture(gl.TEXTURE_2D, null);
 		}
-		
+
+		/* ___ Matriz de Vision ___ */
+		function getMVision()
+		{
+			/* Colocamos una "camara" en la escena, para ello simplemente
+			 * nos colocamos en un punto de la escena mirando hacia el objeto. 
+			 * En OpenGL la camara esta fija y el "mundo" es lo que 
+			 * se transforma (con mModelo).
+			 */
+			var mVision = new glMatrix.ARRAY_TYPE(16);
+
+			// Miramos hacia el objeto mediante mat4.lookAt
+			mat4.lookAt(mVision, [0.0, 0.5, 2.0], [0.0, 0.5, 1.0],
+				[0.0, 100.0, 0.0]);		// Camara mirando al objeto
+				
+			return mVision;
+		}
+
+		/* ___ Matriz de Perspectiva ___ */
+		function getMPerspectiva(fovy, canvas)
+		{
+			/* Creamos las variables para hacer el frustum, mPerspectiva
+			 * no se inicializa a la matriz identidad.
+			 */
+			var mPerspectiva = new glMatrix.ARRAY_TYPE(16);
+			var fovyRad = fovy * Math.PI / 180,
+				aspecto = canvas.width / canvas.height;
+
+			// Hacemos frustum mediante mat4.perspective
+			mat4.perspective(mPerspectiva, fovyRad, aspecto, 1, 500);
+
+			return mPerspectiva;
+		}
+
 		/* ___ Matriz de Modelo ___ */
 		function getMModelo(traslacion, rotacion, escala)
 		{
@@ -324,39 +327,6 @@
 
 			return mModelo;
 		}
-
-		/* ___ Matriz de Vision ___ */
-		function getMVision()
-		{
-			/* Colocamos una "camara" en la escena, para ello simplemente
-			 * nos colocamos en un punto de la escena mirando hacia el objeto. 
-			 * En OpenGL la camara esta fija y el "mundo" es lo que 
-			 * se transforma (con mModelo).
-			 */
-			var mVision = new glMatrix.ARRAY_TYPE(16);
-
-			// Miramos hacia el objeto mediante mat4.lookAt
-			mat4.lookAt(mVision, [0.0, 0.5, 2.0], [0.0, 0.5, 1.0],
-				[0.0, 100.0, 0.0]);		// Camara mirando al objeto
-				
-			return mVision;
-		}
-
-		/* ___ Matriz de Perspectiva ___ */
-		function getMPerspectiva()
-		{
-			/* Creamos las variables para hacer el frustum, mPerspectiva
-			 * no se inicializa a la matriz identidad.
-			 */
-			var mPerspectiva = new glMatrix.ARRAY_TYPE(16);
-			var fovyRad = fovy * Math.PI / 180,
-				aspecto = canvas.width / canvas.height;
-
-			// Hacemos frustum mediante mat4.perspective
-			mat4.perspective(mPerspectiva, fovyRad, aspecto, 1, 500);
-
-			return mPerspectiva;
-		}
 	</script>
 
 	<!-- ****************  VERTEX SHADER  ******************* -->
@@ -380,62 +350,42 @@
 
 		void main() {
 			// AHORA transformo las coordenadas con las matrices.
-			gl_Position = u_PMatrix * u_VMatrix * u_Matrix * a_VertexPosition;
+			mat4 m_v_Matrix = u_VMatrix * u_Matrix;
+			gl_Position = u_PMatrix * m_v_Matrix * a_VertexPosition;
 
 			//v_TextCoord = a_TextCoord;		// varying Coordenadas UV
 
+			// Posicion de la luz.
+			vec3 pos = -(u_VMatrix * a_VertexPosition).xyz;
+			vec3 luz = u_LuzPosicion.xyz;
+			vec3 L = normalize(luz - pos);
+			vec3 E = normalize(-pos);
+			vec3 H = normalize(L + E);
+			vec4 NN = vec4(a_VertexNormal, 0);
 
+			// Transformamos las normales en la posicion de la camara.
+			vec3 N = normalize((m_v_Matrix * NN).xyz);
 
-	vec3 pos = -(u_VMatrix * a_VertexPosition).xyz;
+			// Calculamos la ecuacion de iluminacion.
+			vec4 ambiental = u_Ambiental;
 
-	//fixed light postion
+			float Kd = max(dot(L, N), 0.0);
+			vec4 difusa = Kd * u_Difusa;
 
-	vec3 light = u_LuzPosicion.xyz;
-	vec3 L = normalize(light - pos);
+			float Ks = pow(max(dot(N, H), 0.0), u_Brillantez);
+			vec4 especular = Ks * u_Especular;
 
+			if(dot(L, N) < 0.0) {
+				especular = vec4(0.0, 0.0, 0.0, 1.0);
+			}
+			vColor = ambiental + difusa + especular;
 
-	vec3 E = normalize(-pos);
-	vec3 H = normalize(L + E);
-
-	vec4 NN = vec4(a_VertexNormal, 0);
-
-	// Transform vertex normal into eye coordinates
-
-	vec3 N = normalize((u_VMatrix * NN).xyz);
-
-	// Compute terms in the illumination equation
-	vec4 ambient = u_Ambiental;
-
-	float Kd = max(dot(L, N), 0.0);
-	vec4 diffuse = Kd * u_Difusa;
-
-	float Ks = pow(max(dot(N, H), 0.0), u_Brillantez);
-	vec4 specular = Ks * u_Especular;
-
-	if( dot(L, N) < 0.0 ) {
-		specular = vec4(0.0, 0.0, 0.0, 1.0);
-	}
-
-	vColor = ambient + diffuse +specular;
-
-
-
-
-
-
-
-
-
-
-
-			//vColor = a_VertexColor;			// varying Colores
 			gl_PointSize = 10.0;			// TAMAÑO DEL PUNTO
 		}
 	</script>
 
 	<!-- ****************  FRAGMENT SHADER  ******************* -->
 	<script id="fragment-shader" type="x-shader/x-fragment">
-		
 		varying highp vec4 vColor;
 
 		void main() {
