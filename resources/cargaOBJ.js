@@ -79,6 +79,7 @@ function introduceNormVert(palabra, normalArray) {
  * en objeto3D.datos.vertices.normales
  */
 function introduceCara(palabra, objeto3D, restaV) {
+
 	for (var i = 1; i < palabra.length; i++) {
 		// Obtenemos los indices vX/tX/vnX
 		var subPalabra = palabraToIndice(palabra[i]);
@@ -100,11 +101,7 @@ function introduceCara(palabra, objeto3D, restaV) {
 			objeto3D.datos.vertices[indiceV].normales.push(indiceN);
 		}
 
-
-		/*
-			objeto3D.datos.caras.push(indiceV);
-
-			if (subPalabra[1] != null) {
+		/*	if (subPalabra[1] != null) {
 				// Tiene todos los datos
 				indiceUv = palabraToIndice(subPalabra[1]) - restaT;
 				indiceN = palabraToIndice(subPalabra[2]) - restaN;
