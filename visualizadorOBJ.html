@@ -23,12 +23,12 @@
 			canvas = null,
 			fragmentShader = null,
 			vertexShader = null;
-		// Variables globales para el movimiento de los objetos de la escena
-		var g_Traslacion = [0.0, 0.0, 0.0],	// Desplazamiento
+		// Variables globales para el movimiento de los objetos de la escena.
+		var g_Traslacion = [0.0, 0.0, 0.0],		// Desplazamiento
 			g_Rotacion = [0.0, 0.0, 0.0],		// Rotacion en radianes
 			g_Escala = [1.0, 1.0, 1.0];			// Escalado
 		var fovy = 45;
-		// Variable global con la luz de la escena
+		// Variable global con la luz de la escena.
 		var luz = {
 			posicion: [0.0, -2.0, 5.0, 0.0],
 			ambiental: [0.25, 0.25, 0.25, 1.0],
@@ -211,7 +211,8 @@
 		}
 		
 		/******************  5 INICIA TEXTURAS  ******************/
-		function iniciaTexturas(objetos3D) {
+		function iniciaTexturas(objetos3D)
+		{
 			objetos3D.forEach(function(objeto3D) {
 				objeto3D.datos.material.cargaTextura();
 			});
@@ -258,8 +259,8 @@
 		/* ___ Matriz de Vision ___ */
 		function getMVision()
 		{
-			/* Colocamos una "camara" en la escena, para ello simplemente
-			 * nos colocamos en un punto de la escena mirando hacia el objeto. 
+			/* Colocamos una "camara" en la escena, para ello nos colocamos 
+			 * en un punto de la escena mirando hacia el objeto. 
 			 * En OpenGL la camara esta fija y el "mundo" es lo que 
 			 * se transforma (con mModelo).
 			 */
