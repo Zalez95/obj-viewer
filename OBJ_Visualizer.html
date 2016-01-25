@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="UTF-8">
+	<meta name="description" content="OBJ Visualizer">
+	<meta name="keywords" content="HTML, JavaScript">
+	<meta name="author" content="Daniel González Alonso">
+	<title>WebGL - 3D-OBJ Visualizer</title>
+	<style>
+		body{ background-color: grey; }
+		canvas{ background-color: white;
+				border: 1px solid black; }
+	</style>
+	<script type="text/javascript" src="./resources/gl-matrix.js"></script>
+	<script type="text/javascript" src="./resources/loadOBJ.js"></script>
+	<script type="text/javascript" src="./resources/object3D.js"></script>
+	<script type="text/javascript" src="./resources/material.js"></script>
+	<script type="text/javascript">
+		/****************  Global Variables  ****************/
+		// Program's global variables.
+		var gl = null,
+			canvas = null,
+			fragmentShader = null,
+			vertexShader = null;
+		// Global variables for the movement of the scene's objects.
+		var g_Traslation = [0.0, 0.0, 0.0],		// Traslation
+			g_Rotation = [0.0, 0.0, 0.0],		// Rotation (radians)
+			g_Scale = [1.0, 1.0, 1.0];			// Scale
+		var fovy = 45;
+		// Global variable with the scene's light.
+		var light = {
+			position: [0.0, 2.0, 5.0, 0.0],
+			ambient: [0.4, 0.4, 0.4, 1.0],
+			difusse: [1.0, 1.0, 1.0, 1.0],
+			specular: [1.0, 1.0, 1.0, 1.0]
+		};
+		// Global variables where we will store the text of the OBJ and MTL.
+		var g_fileOBJString = null;
+			g_fileMTLString = null;
+		var objects3D = [];				// Array of object3Ds
+		// Interface's global variables.
+		var trasX,
+			trasY,
+			trasZ,
+			angleX,
+			angleY,
+			angleZ,
+			scaleX,
+			scaleY,
+			scaleZ;
+
+		/*********************  Interface  *********************/
+		// Updates the traslation values and redraw the objects.
+		function updatePositionX() {
+			g_Traslation[0] = trasX.value / 200;
+			drawScene(objects3D);
+		}
+
+		function updatePositionY() {
+			g_Traslation[1] = trasY.value / 200;
+			drawScene(objects3D);
+		}
+
+		function updatePositionZ() {
+			g_Traslation[2] = trasZ.value / 200;
+			drawScene(objects3D);
+		}
+
+		// Updates the rotation values and redraw the objects.
+		function updateRotationX() {
+			g_Rotation[0] = angleX.value * Math.PI / 180;
+			drawScene(objects3D);
+		}
+
+		function updateRotationY() {
+			g_Rotation[1] = angleY.value * Math.PI / 180;
+			drawScene(objects3D);
+		}
+
+		function updateRotationZ() {
+			g_Rotation[2] = angleZ.value * Math.PI / 180;
+			drawScene(objects3D);
+		}
+
+		// Updates the scale values and redraw the objects.
+		function updateScaleX() {
+			g_Scale[0] = scaleX.value / 100;
+			drawScene(objects3D);
+		}
+
+		function updateScaleY() {
+			g_Scale[1] = scaleY.value / 100;
+			drawScene(objects3D);
+		}
+
+		function updateScaleZ() {
+			g_Scale[2] = scaleZ.value / 100;
+			drawScene(objects3D);
+		}
+
+		/***************  1 INIT OBJ VISUALIZER  ***************/
+		function initOBJVisualizer() 
+		{
+			canvas = document.getElementById("canvas");
+			trasX = document.getElementById("trasX");
+			trasY = document.getElementById("trasY");
+			trasZ = document.getElementById("trasZ");
+			angleX = document.getElementById("angleX");
+			angleY = document.getElementById("angleY");
+			angleZ = document.getElementById("angleZ");
+			scaleX = document.getElementById("scaleX");
+			scaleY = document.getElementById("scaleY");
+			scaleZ = document.getElementById("scaleZ");
+			gl = canvas.getContext("webgl");
+					
+			if(gl) {
+				objects3D = readOBJ(g_fileOBJString, g_fileMTLString);
+				
+				initWebGL();
+				initEveryShader(objects3D);
+				initEveryBuffer(objects3D);
+				drawScene(objects3D);		// Draw objects3D for first time.
+			} else {
+				alert("El navegador no soporta WEBGL.");
+			}
+		}
+
+		/*******************  2 INIT WEBGL  *******************/ 
+		function initWebGL()
+		{
+			// Sets the Background color to white.
+			gl.clearColor(1.0, 1.0, 1.0, 1.0);
+			gl.enable(gl.DEPTH_TEST);
+			gl.enable(gl.CULL_FACE);
+			gl.cullFace(gl.BACK);		// Back faces.
+			
+			// Creates a viewport of the canvas size
+			gl.viewport(0, 0, canvas.width, canvas.height);
+		}
+		
+		/******************  3 INIT SHADERS  ******************/
+		function initEveryShader(objects3D)
+		{
+			objects3D.forEach(function(object3D) {
+				// Get the shaders of every Object3D
+				object3D.programInfo = initShaders();
+				/* Get the ubication of the attributes and uniforms of every
+				 * Object3D and introduce it in their "oAttributes" and
+				 * "oUniforms" properties to easier access.
+				 */
+				object3D.locateAttributes();
+				object3D.locateUniforms();
+			});
+		}
+
+		/*******************  3.1 INIT SHADER  *******************/
+		function initShaders()
+		{
+			// Init the shaders.
+			// 1. Gets the location to the shaders
+			var fs_source = document.getElementById("fragment-shader")
+				.innerHTML;
+			var vs_source = document.getElementById("vertex-shader")
+				.innerHTML;
+
+			// 2. Compile the shaders
+			vertexShader = makeShader(vs_source, gl.VERTEX_SHADER);
+			fragmentShader = makeShader(fs_source, gl.FRAGMENT_SHADER);
+			
+			// 3. Creates the program.
+			var glProgram = gl.createProgram();
+			
+			// 4. Attach the shaders to the program.
+			gl.attachShader(glProgram, vertexShader);
+			gl.attachShader(glProgram, fragmentShader);
+			gl.linkProgram(glProgram);
+
+			if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+				alert("The program can't be initiated.");
+			}
+			
+			// 5. Use the program.
+			gl.useProgram(glProgram);
+			
+			return glProgram;
+		}
+
+		/*******************  3.2 MAKE SHADER  *******************/
+		function makeShader(src, type)
+		{
+			// Compile every shader.
+			var shader = gl.createShader(type);
+			gl.shaderSource(shader, src);
+			gl.compileShader(shader);
+
+			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+				alert("Shader compilation error: " +
+					gl.getShaderInfoLog(shader));
+			}
+			return shader;
+		}
+		
+		/*******************  4 INIT BUFFERS  *******************/
+		function initEveryBuffer(objects3D)
+		{
+			objects3D.forEach(function(object3D) {
+				object3D.setupBuffer();
+			});
+		}
+		
+		/********************  6 DRAW SCENE  ********************/
+		function drawScene(objects3D)
+		{	
+			// Clean the canvas and depth buffer.
+			//gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+			
+			// We get the Vision, Perspective and Model matrixes.
+			var mVision = getMVision();
+			var mPerspective = getMPerspective(fovy, canvas);
+			var mModel = getMModel(g_Traslation, g_Rotation, g_Scale);
+
+			objects3D.forEach(function(object3D) {
+				gl.useProgram(object3D.programInfo);
+				// Introduce the attributes in the Vertex Shader.
+				object3D.setupAttributes();
+				// Introduce the uniform matrixes in the Vertex Shader.
+				object3D.setupUniforms(mVision, mPerspective, mModel, light);
+
+				// Draw:
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 
+					object3D.buffers.faceBuffer);
+				gl.drawElements(gl.TRIANGLES,
+					object3D.buffers.faceBuffer.nPoints, 
+					gl.UNSIGNED_SHORT, 0);
+			});
+		}
+
+		/* ___ Vision Matrix ___ */
+		function getMVision()
+		{
+			/* We insert a "camera" in the scene, for this we stand in a point
+			 * of the world looking to the objects. 
+			 * In OpenGL the camera doesn't move, it is fixed in a point,
+			 * instead the "world" is transformed with mModel
+			 * (it moves around us).
+			 */
+			var mVision = new glMatrix.ARRAY_TYPE(16);
+
+			// We look to the object with mat4.lookAt
+			mat4.lookAt(mVision, [0.0, 0.5, 2.0], [0.0, 0.5, 1.0],
+				[0.0, 100.0, 0.0]);
+				
+			return mVision;
+		}
+
+		/* ___ Perspective Matrix ___ */
+		function getMPerspective(fovy, canvas)
+		{
+			/* We create the variables for the frustrum: mPerspective.
+			 * We shouldn't initialize it to the identity matrix.
+			 */
+			var mPerspective = new glMatrix.ARRAY_TYPE(16);
+			var fovyRad = fovy * Math.PI / 180,
+				aspecto = canvas.width / canvas.height;
+
+			// We make frustum with mat4.perspective
+			mat4.perspective(mPerspective, fovyRad, aspecto, 1, 500);
+
+			return mPerspective;
+		}
+
+		/* ___ Model Matrix ___ */
+		function getMModel(traslation, rotation, scale)
+		{
+			/* We create the rotation, traslation and Scale matrixes.
+			 */
+			var mModel = mat4.create();	// Matrix with the modifications.
+			var mTraslation = mat4.create();
+			var mRotation = mat4.create(),
+				mRotationX = mat4.create(),
+				mRotationY = mat4.create(),
+				mRotationZ = mat4.create();
+			var mScale = mat4.create();
+
+			/* Calculates the rotation, traslation and Scale matrixes with
+			 * gl-matrix.js
+			 */
+			// Traslation
+			mat4.translate(mTraslation, mTraslation, traslation);
+
+			// Rotation
+			mat4.rotateX(mRotationX, mRotationX, rotation[0]);
+			mat4.rotateY(mRotationY, mRotationY, rotation[1]);
+			mat4.rotateZ(mRotationZ, mRotationZ, rotation[2]);
+			mat4.multiply(mRotation, mRotation, mRotationZ);
+			mat4.multiply(mRotation, mRotation, mRotationY);
+			mat4.multiply(mRotation, mRotation, mRotationX);
+			
+			// Scale
+			mat4.scale(mScale, mScale, scale);
+			
+			/* We calculate the Model matrix multiplying the matrixes with
+			 * mat4.multiply of gl-matrix.js, all the multiplications goes
+			 * from right to left.
+			 */
+			mat4.multiply(mModel, mRotation, mScale);
+			mat4.multiply(mModel, mTraslation, mModel);
+
+			return mModel;
+		}
+	</script>
+
+	<!-- ****************  VERTEX SHADER  ******************* -->
+	<script id="vertex-shader" type="x-shader/x-vertex">
+		// Attributes
+		attribute vec4 a_VertexPosition;	// Vertexes Positions.
+		attribute vec3 a_VertexNormal;		// Vertexes Normals.
+
+		// Varying
+		varying highp vec4 vLightColor;
+
+		// Uniforms
+		uniform vec4 u_LightPosition;		// Lights
+		uniform vec4 u_Ambient, u_Difusse, u_Specular;
+		uniform float u_Shininess;
+		uniform mat4 u_Matrix;				// Model matrix.
+		uniform mat4 u_PMatrix;				// Perspective matrix.
+		uniform mat4 u_VMatrix;				// Vision matrix.
+
+		void main() {
+			// Now we transform the coordinates with the uniform matrixes.
+			mat4 m_v_Matrix = u_VMatrix * u_Matrix;
+			gl_Position = u_PMatrix * m_v_Matrix * a_VertexPosition;
+
+			// Light position.
+			vec3 pos = -(u_VMatrix * a_VertexPosition).xyz;
+			vec3 light = u_LightPosition.xyz;
+			vec3 L = normalize(light - pos);
+			vec3 E = normalize(-pos);
+			vec3 H = normalize(L + E);
+			vec4 NN = vec4(a_VertexNormal, 0);
+
+			// We transformate the normals with the camera position.
+			vec3 N = normalize((m_v_Matrix * NN).xyz);
+
+			// We calculate the ilumination ecuation.
+			vec4 ambient = u_Ambient;
+
+			float Kd = max(dot(L, N), 0.0);
+			vec4 difusse = Kd * u_Difusse;
+
+			float Ks = pow(max(dot(N, H), 0.0), u_Shininess);
+			vec4 specular = Ks * u_Specular;
+
+			if(dot(L, N) < 0.0) {
+				specular = vec4(0.0, 0.0, 0.0, 1.0);
+			}
+			vLightColor = ambient + difusse + specular;
+
+			gl_PointSize = 10.0;			// Point size.
+		}
+	</script>
+
+	<!-- ****************  FRAGMENT SHADER  ******************* -->
+	<script id="fragment-shader" type="x-shader/x-fragment">
+		varying highp vec4 vLightColor;
+
+		void main() {
+			gl_FragColor = vLightColor;
+		}
+	</script>
+</head>
+
+<body>
+	<div id="container">
+		<div id="loadFiles">
+			<table width="854">
+				<tr>
+					<td>
+						<i>OBJ:</i>
+						<input id="selectFileOBJ" type="file"></input>
+					</td>
+					<td>
+						<i>MTL:</i>
+						<input id="selectFileMTL" type="file"></input>
+					</td>
+					<td>
+						<button onclick="actionButton()">Visualize</button>
+					</td>
+				</tr>
+			</table>
+			<script type="text/javascript">				
+				// Event that loads the OBJ file in "g_fileOBJString".
+				function readFileOBJ(evt) {
+					var f = evt.target.files[0]; 
+					if (f) {
+						var r = new FileReader();
+						r.onload = function(e) { 
+							g_fileOBJString = e.target.result;
+						}
+						r.readAsText(f);
+					} else { 
+						alert("Failed to load file.");
+					}
+				}
+				document.getElementById('selectFileOBJ')
+					.addEventListener('change', readFileOBJ, false);
+				
+				// Event that loads the OBJ file in "g_fileMTLString".
+				function readFileMTL(evt) {
+					var f = evt.target.files[0]; 
+					if (f) {
+						var r = new FileReader();
+						r.onload = function(e) { 
+							g_fileMTLString = e.target.result;
+						}
+						r.readAsText(f);
+					} else { 
+						alert("Failed to load file.");
+					}
+				}
+				document.getElementById('selectFileMTL')
+					.addEventListener('change', readFileMTL, false);
+				
+				/* Init Button's Action: inits the visualizer if we've got
+				 * both files.
+				 */
+				function actionButton() {
+					if ((g_fileOBJString) && (g_fileMTLString)) {
+						initOBJVisualizer();
+					} else {
+						alert("It needs both files.");
+					}
+				}
+			</script>			
+		</div>
+		<canvas id="canvas" width="854" height="480"></canvas>
+		<div id="handlers">
+			<table width="854">
+				<tr>
+					<td>
+						<i>traslX</i>
+						<input id="trasX" type="range" min="-200" max="200"
+							value="0" oninput="updatePositionX()">
+					</td>
+					<td>
+						<i>traslY</i>
+						<input id="trasY" type="range" min="-200" max="200"
+							value="0" oninput="updatePositionY()">
+					</td>
+					<td>
+						<i>traslZ</i>
+						<input id="trasZ" type="range" min="-200" max="200"
+							value="0" oninput="updatePositionZ()">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<i>angleX</i>
+						<input id="angleX" type="range" min="-180" max="180"
+							value="0" oninput="updateRotationX()">
+					</td>
+					<td>
+						<i>angleY</i>
+						<input id="angleY" type="range" min="-180" max="180"
+							value="0" oninput="updateRotationY()">
+					</td>
+					<td>
+						<i>angleZ</i>
+						<input id="angleZ" type="range" min="-180" max="180"
+							value="0" oninput="updateRotationZ()">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<i>scaleX</i>
+						<input id="scaleX" type="range" min="0" max="200"
+							value="100" oninput="updateScaleX()">
+					</td>
+					<td>
+						<i>scaleY</i>
+						<input id="scaleY" type="range" min="0" max="200"
+							value="100" oninput="updateScaleY()">
+					</td>
+					<td>
+						<i>scaleZ</i>
+						<input id="scaleZ" type="range" min="0" max="200"
+							value="100" oninput="updateScaleZ()">
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+</body>
+</html>
