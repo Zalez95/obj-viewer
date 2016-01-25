@@ -1,0 +1,46 @@
+# Blender MTL File: 'None'
+# Material Count: 4
+
+newmtl Material_body
+Ns 94.117647
+Ka 0.300000 0.300000 0.300000
+Kd 0.500000 0.396475 0.141758
+Ks 0.100000 0.100000 0.100000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd D:\Faztor\OneDrive\Documentos\Proyectos Blender\Pony\Fluttershy\Textures\FS-Tex.png
+
+newmtl Material_eye
+Ns 96.078431
+Ka 0.050000 0.050000 0.050000
+Kd 0.640000 0.640000 0.640000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 3
+map_Kd D:\\Faztor\\OneDrive\\Documentos\\Proyectos Blender\\Pony\\Fluttershy\\Textures\\FS-Eye.png
+
+newmtl Material_eyebrow
+Ns 94.117647
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd D:\Faztor\OneDrive\Documentos\Proyectos Blender\Pony\Fluttershy\Textures\FS-Tex.png
+
+newmtl Material_hair
+Ns 94.117647
+Ka 0.000000 0.000000 0.000000
+Kd 0.419400 0.236766 0.295309
+Ks 0.050000 0.050000 0.050000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd D:\Faztor\OneDrive\Documentos\Proyectos Blender\Pony\Fluttershy\Textures\FS-Hair.png

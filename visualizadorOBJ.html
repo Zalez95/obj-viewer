@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="UTF-8">
+	<meta name="description" content="Visualizador de OBJs">
+	<meta name="keywords" content="HTML, JavaScript">
+	<meta name="author" content="Daniel González Alonso">
+	<title>WebGL - Visualizador 3D</title>
+	<style>
+		body{ background-color: grey; }
+		canvas{ background-color: white;
+				border: 1px solid black; }
+	</style>
+	<script type="text/javascript" src="./resources/gl-matrix.js"></script>
+	<script type="text/javascript" src="./resources/cargaOBJ.js"></script>
+	<script type="text/javascript" src="./resources/objeto3D.js"></script>
+	<script type="text/javascript" src="./resources/material.js"></script>
+	<script type="text/javascript">
+		/****************  Variables Globales  ****************/
+		// Variables globales del programa.
+		var gl = null,
+			canvas = null,
+			fragmentShader = null,
+			vertexShader = null;
+		// Variables globales para el movimiento de los objetos de la escena.
+		var g_Traslacion = [0.0, 0.0, 0.0],		// Desplazamiento
+			g_Rotacion = [0.0, 0.0, 0.0],		// Rotacion en radianes
+			g_Escala = [1.0, 1.0, 1.0];			// Escalado
+		var fovy = 45;
+		// Variable global con la luz de la escena.
+		var luz = {
+			posicion: [0.0, -2.0, 5.0, 0.0],
+			ambiental: [0.25, 0.25, 0.25, 1.0],
+			difusa: [1.0, 1.0, 1.0, 1.0],
+			especular: [1.0, 1.0, 1.0, 1.0]
+		};
+		// Variables globales donde se guardaran los textos del OBJ y el MTL.
+		var g_archivoOBJString = [];
+			g_archivoMTLString = [];
+		var objetos3D = [];				// Array de objeto3D
+		// Variables globales para la interfaz.
+		var trasX,
+			trasY,
+			trasZ,
+			anguloX,
+			anguloY,
+			anguloZ,
+			tamX,
+			tamY,
+			tamZ;
+
+		/*********************  Interfaz  *********************/
+		// Actualiza los valores de la traslacion y redibuja el objeto.
+		function actualizaPosicionX() {
+			g_Traslacion[0] = trasX.value / 200;
+			drawScene(objetos3D);
+		}
+
+		function actualizaPosicionY() {
+			g_Traslacion[1] = trasY.value / 200;
+			drawScene(objetos3D);
+		}
+
+		function actualizaPosicionZ() {
+			g_Traslacion[2] = trasZ.value / 200;
+			drawScene(objetos3D);
+		}
+
+		// Actualiza los valores de la rotacion y redibuja el objeto.
+		function actualizaRotacionX() {
+			g_Rotacion[0] = anguloX.value * Math.PI / 180;
+			drawScene(objetos3D);
+		}
+
+		function actualizaRotacionY() {
+			g_Rotacion[1] = anguloY.value * Math.PI / 180;
+			drawScene(objetos3D);
+		}
+
+		function actualizaRotacionZ() {
+			g_Rotacion[2] = anguloZ.value * Math.PI / 180;
+			drawScene(objetos3D);
+		}
+
+		// Actualiza los valores de la escala y redibuja el objeto.
+		function actualizaEscalaX() {
+			g_Escala[0] = tamX.value / 100;
+			drawScene(objetos3D);
+		}
+
+		function actualizaEscalaY() {
+			g_Escala[1] = tamY.value / 100;
+			drawScene(objetos3D);
+		}
+
+		function actualizaEscalaZ() {
+			g_Escala[2] = tamZ.value / 100;
+			drawScene(objetos3D);
+		}
+
+		/*******************  1 INIT WEBGL  *******************/
+		function initWebGL() 
+		{
+			canvas = document.getElementById("canvas");
+			trasX = document.getElementById("trasX");
+			trasY = document.getElementById("trasY");
+			trasZ = document.getElementById("trasZ");
+			anguloX = document.getElementById("anguloX");
+			anguloY = document.getElementById("anguloY");
+			anguloZ = document.getElementById("anguloZ");
+			tamX = document.getElementById("tamX");
+			tamY = document.getElementById("tamY");
+			tamZ = document.getElementById("tamZ");
+			gl = canvas.getContext("webgl");
+					
+			if(gl) {
+				objetos3D = leerOBJ(g_archivoOBJString, g_archivoMTLString);
+				
+				iniciaWebGL();
+				iniciaShaders(objetos3D);
+				iniciaBuffers(objetos3D);
+				//iniciaTexturas(objetos3D);
+				drawScene(objetos3D);		// Dibujamos objetos3D por 1a vez.
+			} else {
+				alert("El navegador no soporta WEBGL.");
+			}
+		}
+
+		/*******************  2 INICIA WEBGL  *******************/ 
+		function iniciaWebGL()
+		{
+			// Pone el color de fondo a verde <-- para 2d no funciona.
+			gl.clearColor(1.0, 1.0, 1.0, 1.0);
+			gl.enable(gl.DEPTH_TEST);
+			gl.enable(gl.CULL_FACE);
+			gl.cullFace(gl.BACK);		// Caras traseras
+			
+			// Crea un viewport del tamaño del canvas.
+			gl.viewport(0, 0, canvas.width, canvas.height);
+		}
+		
+		/******************  3 INICIA SHADERS  ******************/
+		function iniciaShaders(objetos3D)
+		{
+			objetos3D.forEach(function(objeto3D) {
+				// Obtenemos los shaders de cada objeto3D.
+				objeto3D.programInfo = initShaders();
+				/* Obtenemos la ubicacion de los atributos y uniformes de cada
+				 * objeto3D en sus propiedades "atributos" y "uniformes" para
+				 * acceder a ellos mas facilmente.
+				 */
+				objeto3D.localizaAtributos();
+				objeto3D.localizaUniformes();
+			});
+		}
+
+		/*******************  3.1 INIT SHADER  *******************/
+		function initShaders()
+		{
+			// Inicializa los shaders.
+			// 1.Obtengo la referencia de los shaders.
+			var fs_source = document.getElementById("fragment-shader")
+				.innerHTML;
+			var vs_source = document.getElementById("vertex-shader")
+				.innerHTML;
+
+			// 2. Compila los shaders.
+			vertexShader = makeShader(vs_source, gl.VERTEX_SHADER);
+			fragmentShader = makeShader(fs_source, gl.FRAGMENT_SHADER);
+			
+			// 3. Crea un programa.
+			var glProgram = gl.createProgram();
+			
+			// 4. Adjunta al programa cada shader.
+			gl.attachShader(glProgram, vertexShader);
+			gl.attachShader(glProgram, fragmentShader);
+			gl.linkProgram(glProgram);
+
+			if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+				alert("No se puede inicializar el Programa.");
+			}
+			
+			// 5. Usa el programa.
+			gl.useProgram(glProgram);
+			
+			return glProgram;
+		}
+
+		/*******************  3.2 MAKE SHADER  *******************/
+		function makeShader(src, type)
+		{
+			//Compila cada shader.
+			var shader = gl.createShader(type);
+			gl.shaderSource(shader, src);
+			gl.compileShader(shader);
+
+			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+				alert("Error de compilación del shader: " +
+					gl.getShaderInfoLog(shader));
+			}
+			return shader;
+		}
+		
+		/*******************  4 INICIA BUFFERS  *******************/
+		function iniciaBuffers(objetos3D)
+		{
+			objetos3D.forEach(function(objeto3D) {
+				objeto3D.setupBuffer();
+			});
+		}
+		
+		/******************  5 INICIA TEXTURAS  ******************/
+		function iniciaTexturas(objetos3D)
+		{
+			objetos3D.forEach(function(objeto3D) {
+				objeto3D.datos.material.cargaTextura();
+			});
+		}
+		
+		/********************  6 Draw Scene  ********************/
+		function drawScene(objetos3D)
+		{	
+			// Limpia el canvas y el buffer de profundidad.
+			gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+			
+			// Obtenemos las matrices de Vision, Profundidad y Modelo.
+			var mVision = getMVision();
+			var mPerspectiva = getMPerspectiva(fovy, canvas);
+			var mModelo = getMModelo(g_Traslacion, g_Rotacion, g_Escala);
+			
+			//console.log(objetos3D);
+			//var contTextura = 0;
+			objetos3D.forEach(function(objeto3D) {
+				gl.useProgram(objeto3D.programInfo);
+				// Introducimos los atributos en el Vertex Shader.
+				objeto3D.setupAttributes();
+				// Introducimos las matrices uniformes en el Vertex Shader.
+				objeto3D.setupUniformes(mVision, mPerspectiva, mModelo, luz);
+				
+				// Texturas:
+				/*
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_2D, objeto3D.datos.material.textura);
+				gl.uniform1i(objeto3D.programInfo.samplerUniform, 0);
+				*/
+				
+				// Dibujamos:
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 
+					objeto3D.buffers.carasBuffer);
+				gl.drawElements(gl.TRIANGLES,
+					objeto3D.buffers.carasBuffer.npuntos, 
+					gl.UNSIGNED_SHORT, 0);
+			});
+			//Cleanup texture binds.
+			//gl.bindTexture(gl.TEXTURE_2D, null);
+		}
+
+		/* ___ Matriz de Vision ___ */
+		function getMVision()
+		{
+			/* Colocamos una "camara" en la escena, para ello nos colocamos 
+			 * en un punto de la escena mirando hacia el objeto. 
+			 * En OpenGL la camara esta fija y el "mundo" es lo que 
+			 * se transforma (con mModelo).
+			 */
+			var mVision = new glMatrix.ARRAY_TYPE(16);
+
+			// Miramos hacia el objeto mediante mat4.lookAt
+			mat4.lookAt(mVision, [0.0, 0.5, 2.0], [0.0, 0.5, 1.0],
+				[0.0, 100.0, 0.0]);		// Camara mirando al objeto
+				
+			return mVision;
+		}
+
+		/* ___ Matriz de Perspectiva ___ */
+		function getMPerspectiva(fovy, canvas)
+		{
+			/* Creamos las variables para hacer el frustum, mPerspectiva
+			 * no se inicializa a la matriz identidad.
+			 */
+			var mPerspectiva = new glMatrix.ARRAY_TYPE(16);
+			var fovyRad = fovy * Math.PI / 180,
+				aspecto = canvas.width / canvas.height;
+
+			// Hacemos frustum mediante mat4.perspective
+			mat4.perspective(mPerspectiva, fovyRad, aspecto, 1, 500);
+
+			return mPerspectiva;
+		}
+
+		/* ___ Matriz de Modelo ___ */
+		function getMModelo(traslacion, rotacion, escala)
+		{
+			/* Creamos las matrices rotacion, traslacion, escalado.
+			 */
+			var mModelo = mat4.create();	// Matriz con las modificaciones
+			var mTrasladar = mat4.create();
+			var mRotar = mat4.create(),
+				mRotarX = mat4.create(),
+				mRotarY = mat4.create(),
+				mRotarZ = mat4.create();
+			var mEscalar = mat4.create();
+
+			/* Calcula las matrices de traslacion, rotacion y escalado
+			 * mediante gl-matrix.js
+			 */
+			// Traslacion
+			mat4.translate(mTrasladar, mTrasladar, traslacion);
+
+			// Rotacion
+			mat4.rotateX(mRotarX, mRotarX, rotacion[0]);
+			mat4.rotateY(mRotarY, mRotarY, rotacion[1]);
+			mat4.rotateZ(mRotarZ, mRotarZ, rotacion[2]);
+			mat4.multiply(mRotar, mRotar, mRotarZ);
+			mat4.multiply(mRotar, mRotar, mRotarY);
+			mat4.multiply(mRotar, mRotar, mRotarX);
+			
+			// Escalado
+			mat4.scale(mEscalar, mEscalar, escala);
+			
+			/* Calculamos la matriz de Modelo multiplicando las matrices 
+			 * con mat4.multiply de gl-matrix.js, las multiplicaciones van
+			 * de derecha a izquierda.
+			 */
+			mat4.multiply(mModelo, mRotar, mEscalar);
+			mat4.multiply(mModelo, mTrasladar, mModelo);
+
+			return mModelo;
+		}
+	</script>
+
+	<!-- ****************  VERTEX SHADER  ******************* -->
+	<script id="vertex-shader" type="x-shader/x-vertex">
+		// Atributos
+		attribute vec4 a_VertexPosition;	// Posicion de los vertices.
+		attribute vec3 a_VertexNormal;		// Normales de los vertices.
+		//attribute vec2 a_TextCoord;		// Coordenadas UV de los vertices.
+
+		// Varying
+		varying highp vec4 vColor;
+		//varying vec2 v_TextCoord;
+
+		// Uniformes
+		uniform vec4 u_LuzPosicion;				// Luces
+		uniform vec4 u_Ambiental, u_Difusa, u_Especular;
+		uniform float u_Brillantez;
+		uniform mat4 u_Matrix;				// Matriz de modelo.
+		uniform mat4 u_PMatrix;				// Matriz de perspectiva.
+		uniform mat4 u_VMatrix;				// Matriz de vision.
+
+		void main() {
+			// AHORA transformo las coordenadas con las matrices.
+			mat4 m_v_Matrix = u_VMatrix * u_Matrix;
+			gl_Position = u_PMatrix * m_v_Matrix * a_VertexPosition;
+
+			//v_TextCoord = a_TextCoord;		// varying Coordenadas UV
+
+			// Posicion de la luz.
+			vec3 pos = -(u_VMatrix * a_VertexPosition).xyz;
+			vec3 luz = u_LuzPosicion.xyz;
+			vec3 L = normalize(luz - pos);
+			vec3 E = normalize(-pos);
+			vec3 H = normalize(L + E);
+			vec4 NN = vec4(a_VertexNormal, 0);
+
+			// Transformamos las normales en la posicion de la camara.
+			vec3 N = normalize((m_v_Matrix * NN).xyz);
+
+			// Calculamos la ecuacion de iluminacion.
+			vec4 ambiental = u_Ambiental;
+
+			float Kd = max(dot(L, N), 0.0);
+			vec4 difusa = Kd * u_Difusa;
+
+			float Ks = pow(max(dot(N, H), 0.0), u_Brillantez);
+			vec4 especular = Ks * u_Especular;
+
+			if(dot(L, N) < 0.0) {
+				especular = vec4(0.0, 0.0, 0.0, 1.0);
+			}
+			vColor = ambiental + difusa + especular;
+
+			gl_PointSize = 10.0;			// TAMAÑO DEL PUNTO
+		}
+	</script>
+
+	<!-- ****************  FRAGMENT SHADER  ******************* -->
+	<script id="fragment-shader" type="x-shader/x-fragment">
+		varying highp vec4 vColor;
+
+		void main() {
+			gl_FragColor = vColor;
+		}
+		
+		/*
+		precision mediump float;
+		
+		// Procede del Vertex Shader
+		varying vec2 v_TextCoord;
+		
+		// La textura
+		uniform sampler2D u_Sampler;
+		void main() {
+			gl_FragColor = texture2D(u_Sampler, v_TextCoord);
+		}
+		*/
+	</script>
+</head>
+
+<body>
+	<div id="contenedor">
+		<div id="cargarArchivos">
+			<table width="854">
+				<tr>
+					<td>
+						<i>OBJ:</i>
+						<input id="selecArchivoOBJ" type="file"></input>
+					</td>
+					<td>
+						<i>MTL:</i>
+						<input id="selecArchivoMTL" type="file"></input>
+					</td>
+					<td>
+						<button onclick="accionBoton()">Iniciar</button>
+					</td>
+				</tr>
+			</table>
+			<script type="text/javascript">
+				var numArchivos = 0;	// Numero de archivos cargados.
+				
+				// Evento que carga el archivo OBJ en "g_archivoOBJString".
+				function leerArchivoOBJ(evt) {
+					var f = evt.target.files[0]; 
+					if (f) {
+						var r = new FileReader();
+						r.onload = function(e) { 
+							g_archivoOBJString = e.target.result;
+							numArchivos++;
+						}
+						r.readAsText(f);
+					} else { 
+						alert("Fallo al cargar archivo.");
+					}
+				}
+				document.getElementById('selecArchivoOBJ')
+					.addEventListener('change', leerArchivoOBJ, false);
+				
+				// Evento que carga el archivo MTL en "g_archivoMTLString".
+				function leerArchivoMTL(evt) {
+					var f = evt.target.files[0]; 
+					if (f) {
+						var r = new FileReader();
+						r.onload = function(e) { 
+							g_archivoMTLString = e.target.result;
+							numArchivos++;
+						}
+						r.readAsText(f);
+					} else { 
+						alert("Fallo al cargar archivo.");
+					}
+				}
+				document.getElementById('selecArchivoMTL')
+					.addEventListener('change', leerArchivoMTL, false);
+				
+				/* Accion del boton iniciar: inicia webgl si se han 
+				 * introducido ambos archivos.
+				 */
+				function accionBoton() {
+					if (numArchivos >= 2) {
+						numArchivos = 0;
+						initWebGL();
+					}
+				}
+			</script>			
+		</div>
+		<canvas id="canvas" width="854" height="480"></canvas>
+		<div id="manejadores">
+			<table width="854">
+				<tr>
+					<td>
+						<i>trasX</i>
+						<input id="trasX" type="range" min="-200" max="200"
+							value="0" oninput="actualizaPosicionX()">
+					</td>
+					<td>
+						<i>trasY</i>
+						<input id="trasY" type="range" min="-200" max="200"
+							value="0" oninput="actualizaPosicionY()">
+					</td>
+					<td>
+						<i>trasZ</i>
+						<input id="trasZ" type="range" min="-200" max="200"
+							value="0" oninput="actualizaPosicionZ()">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<i>angX</i>
+						<input id="anguloX" type="range" min="-180" max="180"
+							value="0" oninput="actualizaRotacionX()">
+					</td>
+					<td>
+						<i>angY</i>
+						<input id="anguloY" type="range" min="-180" max="180"
+							value="0" oninput="actualizaRotacionY()">
+					</td>
+					<td>
+						<i>angZ</i>
+						<input id="anguloZ" type="range" min="-180" max="180"
+							value="0" oninput="actualizaRotacionZ()">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<i>tamX</i>
+						<input id="tamX" type="range" min="0" max="200"
+							value="100" oninput="actualizaEscalaX()">
+					</td>
+					<td>
+						<i>tamY</i>
+						<input id="tamY" type="range" min="0" max="200"
+							value="100" oninput="actualizaEscalaY()">
+					</td>
+					<td>
+						<i>tamZ</i>
+						<input id="tamZ" type="range" min="0" max="200"
+							value="100" oninput="actualizaEscalaZ()">
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+</body>
+</html>
