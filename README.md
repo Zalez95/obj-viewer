@@ -17,6 +17,6 @@ Limitations:
 * If the materials from .mtl can't be loaded, the model will be seen with the default material, which is Blue.
 * If the object has many polygons, the visualizer can take a long time to load because the normals are calculated at the beginning.
 
-Autor
+Author
 ----
-- Daniel González Alonso
+* Daniel González Alonso
