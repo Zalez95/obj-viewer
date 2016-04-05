@@ -3,10 +3,10 @@
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 	<meta charset="UTF-8">
-	<meta name="description" content="OBJ Visualizer">
+	<meta name="description" content="OBJ Viewer">
 	<meta name="keywords" content="HTML, JavaScript">
 	<meta name="author" content="Daniel González Alonso">
-	<title>WebGL - 3D-OBJ Visualizer</title>
+	<title>WebGL - 3D-OBJ Viewer</title>
 	<style>
 		body{ background-color: grey; }
 		canvas{ background-color: white;
@@ -99,8 +99,8 @@
 			drawScene(objects3D);
 		}
 
-		/***************  1 INIT OBJ VISUALIZER  ***************/
-		function initOBJVisualizer() 
+		/***************  1 INIT OBJ VIEWER  ***************/
+		function initOBJViewer() 
 		{
 			canvas = document.getElementById("canvas");
 			trasX = document.getElementById("trasX");
@@ -386,7 +386,7 @@
 						<input id="selectFileMTL" type="file"></input>
 					</td>
 					<td>
-						<button onclick="actionButton()">Visualize</button>
+						<button onclick="actionButton()">View</button>
 					</td>
 				</tr>
 			</table>
@@ -423,12 +423,12 @@
 				document.getElementById('selectFileMTL')
 					.addEventListener('change', readFileMTL, false);
 				
-				/* Init Button's Action: inits the visualizer if we've got
+				/* Init Button's Action: inits the viewer if we've got
 				 * both files.
 				 */
 				function actionButton() {
 					if ((g_fileOBJString) && (g_fileMTLString)) {
-						initOBJVisualizer();
+						initOBJViewer();
 					} else {
 						alert("It needs both files.");
 					}
